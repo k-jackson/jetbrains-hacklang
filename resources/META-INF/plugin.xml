@@ -1,0 +1,38 @@
+<idea-plugin version="2">
+  <id>com.kjackson.hacklang</id>
+  <name>Hack language support</name>
+  <version>0.1</version>
+  <vendor email="kevin.jackson.public@outlook.com" url="">Kevin Jackson</vendor>
+
+  <description><![CDATA[
+      This plugin adds support for Hack(.hh) files in your IDE!
+      It's very much a work in progress, <br>
+      and many features are not yet implemented.
+    ]]></description>
+
+  <change-notes><![CDATA[
+      0.1 - Syntax highlighting and support for strict-mode files
+    ]]>
+  </change-notes>
+
+  <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+  <idea-version since-build="141.0"/>
+
+  <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
+       on how to target different products -->
+  <depends>com.intellij.modules.lang</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <fileTypeFactory implementation="com.hack.HackFileTypeFactory"/>
+    <lang.parserDefinition language="Hack" implementationClass="com.hack.HackParserDefinition"/>
+    <lang.refactoringSupport language="Hack" implementationClass="com.hack.HackRefactoringSupportProvider"/>
+    <psi.referenceContributor implementation="com.hack.HackReferenceContributor"/>
+    <lang.syntaxHighlighterFactory key="Hack" implementationClass="com.hack.HackSyntaxHighlighterFactory"/>
+    <colorSettingsPage implementation="com.hack.HackColorSettingsPage"/>
+  </extensions>
+
+  <actions>
+    <!-- Add your actions here -->
+  </actions>
+
+</idea-plugin>

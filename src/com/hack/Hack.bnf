@@ -1,0 +1,484 @@
+{
+    parserClass="com.hack.parser.HackParser"
+
+    extends="com.intellij.extapi.psi.ASTWrapperPsiElement"
+
+    psiClassPrefix="Hack"
+    psiImplClassSuffix="Impl"
+    psiPackage="com.hack.psi"
+    psiImplPackage="com.hack.psi.impl"
+
+    elementTypeHolderClass="com.hack.psi.HackTypes"
+    elementTypeClass="com.hack.psi.HackElementType"
+    tokenTypeClass="com.hack.psi.HackTokenType"
+
+    psiImplUtilClass="com.hack.psi.impl.HackPsiImplUtil"
+
+    extends("(assignment|lambda|simple_assignment|compound_assignment|conditional|logical_inc_OR|logical_AND|bitwise_inc_OR|bitwise_exc_OR|bitwise_AND|equality|relational|shift|additive|multiplicative|instanceof|unary|postfix_increment|postfix_decrement|yield)_expression|exponentiation_expr")=expression;
+    extends("collection_literal|tuple_literal|shape_literal|const_expression")=constant_expression;
+    extends("(primary|clone|object_creation|array_creation|subscript|(neg_function|function)_call|member_selection|null_safe_member_selection|scope_resolution)_expr")=postfix_expression;
+    extends("(variable|qualified)_name|literal|(collection|tuple|shape)_literal|(const|paren)_expression|intrinsic|this_ref|anonymous_function_creation_expr")=primary_expr
+}
+
+hackFile ::= script
+
+script ::= HH_OPENING_TAG strict_mode* //todo: capture strictmode token and add support for php mode
+
+private strict_mode ::= declaration_list_
+private declaration_list_ ::= declaration+
+
+declaration ::=
+    inclusion_directive
+    | enum_declaration
+    | function_definition
+    | class_declaration
+    | interface_declaration
+    | trait_declaration
+    | namespace_definition
+    | namespace_use_declaration
+    | alias_declaration
+    | COMMENT
+    
+inclusion_directive ::= require_multiple_directive | require_once_directive //spec calls it an expression?
+require_once_directive ::= REQUIRE_ONCE (L_PAREN include_filename R_PAREN | include_filename) SEMICOLON
+require_multiple_directive ::= REQUIRE (L_PAREN include_filename R_PAREN | include_filename) SEMICOLON
+include_filename ::= single_quoted_string_literal_ | double_quoted_string_literal_
+enum_declaration ::= ENUM name_val enum_base_ enum_constraint_clause_? L_BRACE enumerator_list_? R_BRACE
+private enum_base_ ::= COLON (T_INT|T_STRING)
+private enum_constraint_clause_ ::= AS type_specifier
+private enumerator_list_ ::= enumerator_ SEMICOLON (enumerator_ SEMICOLON)* //todo check if ok (ch13)
+private enumerator_ ::= enumerator_constant_ EQ_ASSIGN constant_expression
+private enumerator_constant_ ::= name_val | collection_names_
+
+
+function_definition ::= function_definition_header_ compound_statement_
+function_definition_header_ ::=
+    attribute_specification_? STATIC? ASYNC? FUNCTION FUNCTION_NAME generic_type_parameter_list_? L_PAREN parameter_list_? R_PAREN COLON return_type_
+    // spec doesn't list support of "static"?
+private return_type_ ::= type_specifier | THIS
+
+class_declaration ::=
+    attribute_specification_? class_modifier_? CLASS name_val generic_type_parameter_list_?
+    class_base_clause_? class_interface_clause_? L_BRACE trait_use_clauses? class_member_declarations? R_BRACE
+    // spec has error in defn? (ch16)
+
+private class_modifier_ ::= ABSTRACT | FINAL
+private class_base_clause_ ::= EXTENDS qualified_name generic_type_parameter_list_?
+private class_interface_clause_ ::=
+    IMPLEMENTS qualified_name generic_type_parameter_list_? (COMMA qualified_name generic_type_parameter_list_?)*
+class_member_declarations ::= class_member_declaration+
+class_member_declaration ::=
+    const_declaration
+    |property_declaration
+    |method_declaration
+    |constructor_declaration
+    |destructor_declaration
+
+const_declaration ::= const_declaration_untyped | const_declaration_typed
+private const_declaration_typed ::= CONST type_specifier constant_declarator_list_ SEMICOLON
+private const_declaration_untyped ::= CONST constant_declarator_list_ SEMICOLON
+constant_declarator_list_ ::= constant_declarator_ (COMMA constant_declarator_)*
+constant_declarator_ ::= name_val EQ_ASSIGN const_expression
+
+property_declaration ::= property_modifier type_specifier property_declarator_list SEMICOLON
+property_declarator_list ::= property_declarator (COMMA property_declarator)*
+property_declarator ::= varname property_initializer?
+property_modifier ::= visibility_modifier static_modifier | static_modifier visibility_modifier | static_modifier
+    | visibility_modifier // spec doesn't appear to support this, but... -- /hack-langspec/tests/Classes/visibility
+visibility_modifier ::= VPUBLIC|VPROTECTED|VPRIVATE
+static_modifier ::= STATIC
+property_initializer ::= EQ_ASSIGN expression
+
+method_declaration ::= attribute_specification_? method_modifier+ (function_definition | function_definition_header_ SEMICOLON)
+method_modifier ::= visibility_modifier | static_modifier | ABSTRACT | FINAL
+
+constructor_declaration ::=
+    attribute_specification_? visibility_modifier FUNCTION CONSTRUCT generic_type_parameter_list_?
+    L_PAREN constructor_parameter_declaration_list? R_PAREN (COLON T_VOID)? compound_statement_
+    //spec doesn't list support of void constructors -- see hack-langspec/tests/Classes/MathLibrary
+constructor_parameter_declaration_list ::= constructor_parameter_declaration (COMMA constructor_parameter_declaration)*
+constructor_parameter_declaration ::= (visibility_modifier? type_specifier varname default_argument_specifier? | ELLIPSIS)
+    // todo: spec doesn't list this as supporting variadic, but it should?
+
+destructor_declaration ::= attribute_specification_? visibility_modifier FUNCTION DESTRUCT generic_type_parameter_list_? L_PAREN R_PAREN compound_statement_
+
+interface_declaration ::=
+    attribute_specification_? INTERFACE name_val generic_type_parameter_list_?
+    interface_base_clause? L_BRACE interface_member_declarations? R_BRACE
+interface_base_clause ::=
+    EXTENDS qualified_name generic_type_parameter_list_? (interface_base_clause_leaf)*
+interface_base_clause_leaf ::= COMMA qualified_name generic_type_parameter_list_?
+interface_member_declarations ::= interface_member_declaration+
+interface_member_declaration ::= require_extends_clause | const_declaration | method_declaration
+
+trait_declaration ::=
+    attribute_specification_? TRAIT name_val generic_type_parameter_list_?
+    L_BRACE trait_use_clauses? trait_member_declaration* R_BRACE
+trait_use_clauses ::= trait_use_clause+
+trait_use_clause ::= USE trait_name_list SEMICOLON
+trait_name_list ::= qualified_name generic_type_parameter_list_? (COMMA qualified_name generic_type_parameter_list_?)*
+trait_member_declaration ::=
+    require_extends_clause
+    |require_implements_clause
+    |property_declaration
+    |const_declaration
+    |method_declaration
+    |constructor_declaration
+    |destructor_declaration
+
+require_extends_clause ::= REQUIRE EXTENDS qualified_name SEMICOLON
+require_implements_clause ::= REQUIRE IMPLEMENTS qualified_name SEMICOLON
+
+namespace_definition ::= NAMESPACE namespace_name SEMICOLON | NAMESPACE namespace_name? L_BRACE (statement|declaration)* R_BRACE
+namespace_use_declaration ::= USE namespace_use_clauses SEMICOLON
+namespace_use_clauses ::= namespace_use_clause (COMMA namespace_use_clause)*
+namespace_use_clause ::= qualified_name namespace_aliasing_clause?
+namespace_aliasing_clause ::= AS name_val
+
+alias_declaration ::=
+    TYPE name_val EQ_ASSIGN type_to_be_aliased_ SEMICOLON
+    | NEWTYPE name_val type_constraint_? EQ_ASSIGN type_to_be_aliased_ SEMICOLON
+private type_constraint_ ::= AS type_constraint_type_
+private type_constraint_type_ ::= type_specifier
+private type_to_be_aliased_ ::= type_specifier | qualified_name | shape_specifier
+
+shape_specifier ::= SHAPE L_PAREN field_specifier_list_? R_PAREN
+private field_specifier_list_ ::= field_specifier_ (COMMA field_specifier_)*
+private field_specifier_ ::= (single_quoted_string_literal_|scope_resolution_expr|integer_literal|qualified_name) KV_ARROW type_specifier
+
+type_specifier ::=
+    T_BOOL
+    | T_INT
+    | T_FLOAT
+    | T_NUM
+    | T_STRING
+    | T_ARRAYKEY
+    | T_VOID
+    | T_RESOURCE
+    | vector_like_array_type_specifier_
+    | map_like_array_type_specifier_
+    | alias_type_specifier_
+    | enum_specifier_
+    | class_interface_trait_specifier_
+    | tuple_type_specifier_
+    | closure_type_specifier_
+    | nullable_type_specifier_
+    | generic_type_parameter_name_
+
+private type_specifier_list_ ::= type_specifier (COMMA type_specifier)*
+private alias_type_specifier_ ::= qualified_name
+private vector_like_array_type_specifier_ ::= (ARRAY|name_val|qualified_name|SET) LT array_value_type_specifier_ (COMMA array_value_type_specifier_)* GT //spec?
+private map_like_array_type_specifier_ ::= (ARRAY|name_val|MAP|PAIR) LT array_value_type_specifier_ COMMA array_value_type_specifier_ GT
+private array_value_type_specifier_ ::= type_specifier
+//private array_key_type_specifier_ ::= type_specifier //todo error in spec?
+private enum_specifier_ ::= qualified_name
+private class_interface_trait_specifier_ ::= qualified_name generic_type_argument_list_?
+private generic_type_argument_list_ ::= LT generic_type_arguments GT
+private generic_type_arguments ::= generic_type_argument (COMMA generic_type_argument)*
+private generic_type_argument ::= type_specifier name_val
+private tuple_type_specifier_ ::= L_PAREN type_specifier COMMA type_specifier_list_ R_PAREN
+private closure_type_specifier_ ::= L_PAREN FUNCTION L_PAREN type_specifier_list_? R_PAREN COLON type_specifier R_PAREN
+private nullable_type_specifier_ ::= QUESTION_MARK type_specifier | MIXED
+private generic_type_parameter_list_ ::= LT generic_type_parameters_ GT
+private generic_type_parameters_ ::= generic_type_parameter_ (COMMA generic_type_parameter_)*
+private generic_type_parameter_ ::= generic_type_parameter_variance_? generic_type_parameter_name_ generic_type_constraint_?
+private generic_type_parameter_name_ ::= T_GENERIC
+private generic_type_parameter_variance_ ::= ADD | SUB
+private generic_type_constraint_ ::= AS type_specifier
+
+private heredoc_string_literal_ ::= HDND_OPEN HD_ID (DQ_STRING|DQ_VAR|DQ_ESCAPE_SEQ)* HD_ID // like a giant DQ string
+private nowdoc_string_literal_ ::= HDND_OPEN ND_ID ND_CONTENTS* ND_ID // like a giant SQ string
+
+private operator_or_punctuator ::=
+    L_BRACKET|R_BRACKET|L_PAREN|R_PAREN|L_BRACE|R_BRACE|PERIOD|ARROW|INCR|DECR|EXP|MULT|ADD|SUB|DIV|MOD|BIT_NOT|NOT|BIT_AND|BIT_OR
+    |BIT_XOR|BIT_SL|BIT_SR|LT|GT|LT_EQ|GT_EQ|EQ|TEQ|NEQ|NTEQ|AND|OR|COLON|SEMICOLON|QUESTION_MARK|EQ_ASSIGN|EXP_ASSIGN
+    |MULT_ASSIGN|DIV_ASSIGN|MOD_ASSIGN|ADD_ASSIGN|SUB_ASSIGN|CONCAT_ASSIGN|BIT_SL_ASSIGN|BIT_SR_ASSIGN|BIT_AND_ASSIGN|BIT_OR_ASSIGN
+    |BIT_XOR_ASSIGN|COMMA|AT_SIGN|SCOPE|KV_ARROW|LAMBDA_ARROW|NULLSAFE_ARROW|SPACESHIP|NULL_COALESCE|HH_FIXME
+
+private compound_assignment_operator_ ::=
+    EXP_ASSIGN|MULT_ASSIGN|DIV_ASSIGN|MOD_ASSIGN|ADD_ASSIGN|SUB_ASSIGN|CONCAT_ASSIGN|BIT_SL_ASSIGN|BIT_SR_ASSIGN
+    |BIT_AND_ASSIGN|BIT_OR_ASSIGN|BIT_XOR_ASSIGN|KV_ARROW
+
+literal ::=
+    boolean_literal
+    |BIT_NOT? integer_literal
+    |BIT_NOT? floating_literal
+    |string_literal
+    |null_literal
+null_literal ::= NULL
+
+floating_literal ::= FLOAT_LITERAL
+
+boolean_literal ::= TRUE|FALSE
+
+integer_literal ::=
+    DECIMAL_LITERAL
+    |OCTAL_LITERAL
+    |hexadecimal_literal
+    |binary_literal
+
+hexadecimal_literal ::= HEX_LITERAL
+binary_literal ::= BIN_LITERAL
+
+string_literal ::=
+    single_quoted_string_literal_
+    | double_quoted_string_literal_
+    | heredoc_string_literal_
+    | nowdoc_string_literal_
+
+single_quoted_string_literal_ ::= SQ_STRING
+double_quoted_string_literal_ ::= D_QUOTE (DQ_STRING | DQ_VAR | DQ_ESCAPE_SEQ)* D_QUOTE
+
+intrinsic ::=
+    array_intrinsic_
+    |echo_intrinsic_
+    |exit_intrinsic_
+    |invariant_intrinsic_
+    |list_intrinsic_
+
+private invariant_intrinsic_ ::= INVARIANT L_PAREN expression COMMA sprintf_format_ (COMMA values_)? R_PAREN
+private sprintf_format_ ::= single_quoted_string_literal_ | double_quoted_string_literal_ // lol
+private values_ ::= (varname | literal) (COMMA values_)*
+
+private exit_intrinsic_ ::= EXIT expression | EXIT L_PAREN expression? R_PAREN
+private echo_intrinsic_ ::= ECHO expression_list_two_or_more_ | ECHO expression | ECHO L_PAREN expression R_PAREN
+private array_intrinsic_ ::= ARRAY L_PAREN array_initializer_? R_PAREN
+private list_intrinsic_ ::= LIST L_PAREN list_expression_list_? R_PAREN
+private list_expression_list_ ::=  COMMA | expression (COMMA expression)+ COMMA? | expression //todo check if ok
+
+expression ::=
+    assignment_expression
+    |conditional_expression
+    |logical_inc_OR_expression
+    |logical_AND_expression
+    |bitwise_inc_OR_expression
+    |bitwise_exc_OR_expression
+    |bitwise_AND_expression
+    |equality_expression
+    |shift_expression
+    |relational_expression
+    |additive_expression
+    |multiplicative_expression
+    |exponentiation_expr
+    |instanceof_expression
+    |postfix_increment_expression // hack
+    |postfix_decrement_expression // hack
+    |yield_expression
+    |unary_expression
+
+yield_expression ::= YIELD array_element_initializer_
+assignment_expression ::= ass_expressions
+private ass_expressions ::= lambda_expression | compound_assignment_expression | simple_assignment_expression
+simple_assignment_expression ::= unary_expression (EQ_ASSIGN|compound_assignment_operator_) expression
+compound_assignment_expression ::= unary_expression compound_assignment_operator_ assignment_expression
+
+lambda_expression ::= ASYNC? lambda_function_sig_ LAMBDA_ARROW anonymous_function_body_
+lambda_function_sig_ ::=  L_PAREN anonymous_function_param_decl_list_? R_PAREN anonymous_function_return_? | varname
+anonymous_function_return_ ::= COLON type_specifier
+anonymous_function_body_ ::= expression | compound_statement_
+conditional_expression ::= expression QUESTION_MARK expression? COLON conditional_expression
+logical_inc_OR_expression ::= expression OR expression
+logical_AND_expression ::= expression AND expression
+bitwise_inc_OR_expression ::= expression BIT_OR expression
+bitwise_exc_OR_expression ::= expression BIT_XOR expression
+bitwise_AND_expression ::= expression BIT_AND expression
+equality_expression ::= expression (EQ|NEQ|TEQ|NTEQ) expression
+relational_expression ::= expression (LT|LT_EQ|GT|GT_EQ) expression
+shift_expression ::= expression (LT LT|GT GT) expression
+additive_expression ::= expression (ADD|SUB|PERIOD) expression
+multiplicative_expression ::= expression (MULT|DIV|MOD) expression
+exponentiation_expr ::= expression EXP expression
+instanceof_expression ::= expression INSTANCEOF (qualified_name|varname)
+postfix_increment_expression ::= unary_expression INCR
+postfix_decrement_expression ::= unary_expression DECR
+
+unary_expression ::=
+    unary_op_expression
+    |postfix_expression
+    |prefix_increment_expression
+    |prefix_decrement_expression
+    |error_control_expression
+    |cast_expression
+    |await_expression
+
+prefix_increment_expression ::= INCR unary_expression
+prefix_decrement_expression ::= DECR unary_expression
+
+unary_op_expression ::= unary_operator (cast_expression | expression) // spec is ?? with this one
+unary_operator ::= NOT|ADD|SUB|B_SLASH
+error_control_expression ::= AT_SIGN expression
+cast_expression ::= L_PAREN cast_type_ R_PAREN unary_expression
+private cast_type_ ::= T_BOOL | T_INT | T_FLOAT | T_STRING
+await_expression ::= AWAIT expression
+
+postfix_expression ::=
+    scope_resolution_expr
+    |primary_expr
+    |clone_expr
+    |object_creation_expr
+    |array_creation_expr
+    |subscript_expr
+    |function_call_expr
+    |neg_function_call_expr
+    |member_selection_expr
+    |null_safe_member_selection_expr
+
+constant_expression ::=
+    array_creation_expr
+    | collection_literal
+    | tuple_literal
+    | shape_literal
+    | const_expression
+
+tuple_literal ::= TUPLE L_PAREN expression_list_one_or_more_ R_PAREN
+private expression_list_one_or_more_ ::= expression (COMMA expression)*
+private expression_list_two_or_more_ ::= expression COMMA expression (COMMA expression)*
+const_expression ::= expression
+
+primary_expr ::=
+    (SUB|BIT_NOT)? (varname|INF|NAN)
+    |qualified_name
+    |literal
+    |collection_literal
+    |tuple_literal
+    |shape_literal
+    //|const_expression
+    |intrinsic
+    |anonymous_function_creation_expr
+    |paren_expression
+    |this_ref
+
+qualified_name ::= namespace_name_as_a_prefix_? (name_val|MAGIC_CONST) (B_SLASH (name_val|MAGIC_CONST))*
+this_ref ::= THIS
+paren_expression ::= L_PAREN expression R_PAREN
+clone_expr ::= CLONE expression
+object_creation_expr ::= NEW class_type_designator_ L_PAREN argument_expression_list_? R_PAREN
+private class_type_designator_ ::= STATIC | ARRAY | qualified_name
+
+subscript_expr ::=
+   postfix_expression (L_BRACKET expression? R_BRACKET|L_BRACE expression? L_BRACE) // todo: brace form is deprecated
+
+function_call_expr ::= postfix_expression L_PAREN argument_expression_list_? R_PAREN
+neg_function_call_expr ::= NOT postfix_expression L_PAREN argument_expression_list_? R_PAREN
+argument_expression_list_ ::= expression (COMMA expression)* COMMA?
+
+member_selection_expr ::= postfix_expression ARROW MEMBER_NAME
+null_safe_member_selection_expr ::= postfix_expression NULLSAFE_ARROW MEMBER_NAME
+
+scope_resolution_expr ::= scope_resolution_qualifier_ SCOPE (FUNCTION_NAME|STATIC_VARIABLE_NAME|collection_names_|CONST_NAME|CLASS)
+scope_resolution_qualifier_ ::= qualified_name | SELF | PARENT | STATIC | ARRAY | varname
+
+array_creation_expr ::= ARRAY L_PAREN array_initializer_? R_PAREN | L_BRACKET array_initializer_? R_BRACKET
+array_initializer_ ::= array_initializer_list_ COMMA?
+array_initializer_list_ ::= array_element_initializer_ (COMMA array_element_initializer_)*
+array_element_initializer_ ::=  expression KV_ARROW expression | expression
+
+namespace_name ::= name_val (B_SLASH name_val)*
+namespace_name_as_a_prefix_ ::=
+    B_SLASH
+    | B_SLASH? namespace_name B_SLASH
+    | NAMESPACE B_SLASH
+    | NAMESPACE B_SLASH namespace_name B_SLASH
+private name_val ::= NAME | T_GENERIC // hack
+
+attribute_ ::= attribute_name_ attribute_value_list_*
+attribute_specification_ ::= LT LT attribute_list_ GT GT
+private attribute_list_ ::= attribute_ (COMMA attribute_)*
+private attribute_name_ ::= name_val
+private attribute_value_list_ ::= L_PAREN attribute_values_? R_PAREN
+private attribute_values_ ::= attribute_value_ (COMMA attribute_values_)*
+private attribute_value_ ::= expression
+
+private anonymous_function_param_decl_list_ ::= anonymous_function_param_decl_ (COMMA anonymous_function_param_decl_)*
+private anonymous_function_param_decl_ ::= attribute_specification_? type_specifier? (varname|ELLIPSIS) default_argument_specifier?
+anonymous_function_creation_expr ::=
+    ASYNC? FUNCTION L_PAREN anonymous_function_param_decl_list_? R_PAREN anonymous_function_return_? anonymous_function_use_clause_? compound_statement_
+private anonymous_function_use_clause_ ::= USE L_PAREN use_varnamelist_ R_PAREN
+private use_varnamelist_ ::= varname (COMMA varname)*
+
+private parameter_list_ ::= ELLIPSIS | parameter_declaration_list_ (COMMA ELLIPSIS)?
+private parameter_declaration_list_ ::= parameter_declaration_ (COMMA parameter_declaration_)*
+private parameter_declaration_ ::= attribute_specification_? type_specifier varname default_argument_specifier?
+private default_argument_specifier ::= EQ_ASSIGN const_expression
+
+compound_statement_ ::= L_BRACE statement* R_BRACE
+
+statement ::=
+    function_static_declaration_
+    | compound_statement_
+    | labeled_statement_
+    | expression_statement_
+    | selection_statement_
+    | iteration_statement_
+    | jump_statement_
+    | try_statement_
+
+private labeled_statement_ ::= case_label_ | default_label_
+private case_label_ ::= CASE expression COLON statement
+private default_label_ ::= DEFAULT COLON statement
+
+expression_statement_ ::= expression? SEMICOLON
+
+selection_statement_ ::= if_statement_ | switch_statement_
+private if_statement_ ::= IF L_PAREN expression R_PAREN statement elseif_clauses_? else_clause_?
+private elseif_clauses_ ::= elseif_clause_*
+private elseif_clause_ ::= ELSEIF L_PAREN expression R_PAREN statement
+private else_clause_ ::= ELSE statement
+private switch_statement_ ::= SWITCH L_PAREN expression R_PAREN compound_statement_
+
+private iteration_statement_ ::= while_statement_ | do_statement_ | for_statement_ | foreach_statement_
+private while_statement_ ::= WHILE L_PAREN expression R_PAREN statement
+private do_statement_ ::= DO statement WHILE L_PAREN expression R_PAREN SEMICOLON
+
+private for_statement_ ::= FOR L_PAREN for_initializer_? SEMICOLON for_control_? SEMICOLON for_end_of_loop_? R_PAREN statement
+private for_initializer_ ::= for_expression_group_
+private for_control_ ::= for_expression_group_
+private for_end_of_loop_ ::=  for_expression_group_
+private for_expression_group_ ::= expression (COMMA for_expression_group_)*
+
+private foreach_statement_ ::= FOREACH L_PAREN foreach_collection_name_ AS foreach_key_? foreach_value_ R_PAREN statement
+private foreach_collection_name_ ::= expression
+private foreach_key_ ::= expression KV_ARROW
+private foreach_value_ ::= list_intrinsic_ | BIT_AND? expression
+
+private jump_statement_ ::= continue_statement_ | break_statement_ | return_statement_ | throw_statement_
+private continue_statement_ ::= CONTINUE SEMICOLON
+private break_statement_ ::= BREAK SEMICOLON
+private return_statement_ ::= RETURN expression? SEMICOLON
+private throw_statement_ ::= THROW expression SEMICOLON
+
+private try_statement_ ::= TRY compound_statement_ (catch_clauses_? finally_clause_?)
+private catch_clauses_ ::= catch_clause_*
+private catch_clause_ ::= CATCH L_PAREN parameter_declaration_list_ R_PAREN compound_statement_
+private finally_clause_ ::= FINALLY compound_statement_
+
+private function_static_declaration_ ::= STATIC static_declarator_list_ SEMICOLON
+private static_declarator_list_ ::= static_declarator_ (COMMA static_declarator_list_)*
+private static_declarator_ ::= varname function_static_initializer_?
+private function_static_initializer_ ::= EQ_ASSIGN const_expression
+
+shape_literal ::= SHAPE L_PAREN field_initializer_list_? R_PAREN
+private field_initializer_list_ ::= field_initializer_ (COMMA field_initializer_)*
+private field_initializer_ ::=
+    single_quoted_string_literal_ KV_ARROW expression
+    | scope_resolution_expr KV_ARROW expression
+    | integer_literal KV_ARROW expression
+    | qualified_name KV_ARROW expression
+
+private collection_names_ ::= ARRAY | SET | MAP
+collection_literal ::=
+    non_key_collection_class_type_ L_BRACE cl_initializer_list_without_keys_? R_BRACE
+    | key_collection_class_type L_BRACE cl_initializer_list_with_keys_? R_BRACE
+    | pair_type_ L_BRACE cl_element_value_ COMMA cl_element_value_ R_BRACE
+private key_collection_class_type ::= ARRAY | MAP //| qualified_name
+private non_key_collection_class_type_ ::= collection_names_
+private pair_type_ ::= PAIR
+private cl_initializer_list_without_keys_ ::= cl_element_value_ (COMMA cl_element_value_)* COMMA?
+private cl_initializer_list_with_keys_ ::= cl_element_key_ KV_ARROW cl_element_value_ (COMMA cl_element_key_ KV_ARROW cl_element_value_)* COMMA?
+private cl_element_key_ ::= expression
+private cl_element_value_ ::= expression
+
+varname ::= VARIABLE_NAME {
+    mixin="com.hack.psi.impl.HackNamedElementImpl"
+    implements="com.hack.psi.HackNamedElement" methods=[getName setName getNameIdentifier]
+}
