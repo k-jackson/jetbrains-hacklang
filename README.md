@@ -20,7 +20,7 @@ This plugin adds support for the Hack programming language to the Jetbrains IDEs
 - Much more
 
 ###Installation
-- Follow the build environment setup instructions at <br> http://www.jetbrains.org/intellij/sdk/docs/tutorials/custom_language_support/prerequisites.html
+- Follow the build environment setup instructions at <br> http://www.jetbrains.org/intellij/sdk/docs/tutorials/custom_language_support/prerequisites.html <br> and http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/setting_up_environment.html
 - Download the repository into the IDE project you created.
 - Run GrammarKit's parser generator (Ctrl+Shift+G, or right-click menu entry) on the src/com.hack/Hack.bnf file 
 to create and populate the /gen/ folder's classes.
