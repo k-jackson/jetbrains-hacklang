@@ -11,5 +11,6 @@
     </content>
     <orderEntry type="jdk" jdkName="IntelliJ IDEA Community Edition IC-162.2032.8" jdkType="IDEA JDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" scope="PROVIDED" name="php-openapi" level="project" />
   </component>
 </module>

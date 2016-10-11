@@ -21,12 +21,12 @@
   <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
        on how to target different products -->
   <depends>com.intellij.modules.lang</depends>
+  <depends>com.intellij.modules.platform</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <fileTypeFactory implementation="com.hack.HackFileTypeFactory"/>
     <lang.parserDefinition language="Hack" implementationClass="com.hack.HackParserDefinition"/>
     <lang.refactoringSupport language="Hack" implementationClass="com.hack.HackRefactoringSupportProvider"/>
-    <psi.referenceContributor implementation="com.hack.HackReferenceContributor"/>
     <lang.syntaxHighlighterFactory key="Hack" implementationClass="com.hack.HackSyntaxHighlighterFactory"/>
     <colorSettingsPage implementation="com.hack.HackColorSettingsPage"/>
   </extensions>
