@@ -7,7 +7,7 @@ This plugin adds support for the Hack programming language to the Jetbrains IDEs
 - Parsing support for main language features (excludes XHP, non-strict mode, and others)
 - In-place rename refactoring for local variables
 
-### ToDo List:
+### To Do List:
 - Add Gradle support for easy installation
 - Add support for XHP
 - Add support for PHP mode and non-strict
@@ -15,8 +15,6 @@ This plugin adds support for the Hack programming language to the Jetbrains IDEs
 - Autocompletion features
 - "Go to" features (implementations, declaration)
 - Optimize grammar
-- Improve error messages from grammar errors
-- Add "tokens=[]" list to grammar to make errors more intuitive
 - Much more
 
 ### Installation

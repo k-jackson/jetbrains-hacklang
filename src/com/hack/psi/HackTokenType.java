@@ -9,9 +9,4 @@ public class HackTokenType extends IElementType {
     public HackTokenType(@NotNull @NonNls String debugName) {
         super(debugName, HackLanguage.INSTANCE);
     }
-
-    @Override
-    public String toString() {
-        return "HackTokenType." + super.toString();
-    }
 }

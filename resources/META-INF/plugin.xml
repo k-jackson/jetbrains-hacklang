@@ -1,7 +1,7 @@
-<idea-plugin version="2">
+<idea-plugin>
   <id>com.kjackson.hacklang</id>
   <name>Hack language support</name>
-  <version>0.1</version>
+  <version>0.1.2</version>
   <vendor email="kevin.jackson.public@outlook.com" url="">Kevin Jackson</vendor>
 
   <description><![CDATA[
@@ -11,7 +11,7 @@
     ]]></description>
 
   <change-notes><![CDATA[
-      0.1 - Syntax highlighting and support for strict-mode files
+      0.1.2 - Added tokens=[] list to grammar, to improve syntax error messages
     ]]>
   </change-notes>
 
